@@ -1,0 +1,218 @@
+---
+title: "**Project Report**"
+output:
+  html_document:
+    df_print: paged
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r include=FALSE}
+setwd("B:/R/531400E")
+options(max.print=5.5E5)
+library(ggplot2)
+library(gganimate)
+library(magrittr)
+library(magick)
+library(stringr)
+library(png)
+library(ggpubr)
+```
+
+## **Summary**
+
+The report provides a detailed analysis on the variables in the data and focuses on the number of occurrences and severity of the collisions. It turns out that Time, Date, X, Y, collision classifications are the critical variables for the understanding of collisions of Ottawa. The rest variables are either not informative or too vague to show any patterns. Hence, to drive safer in Ottawa, it is more important to pay attention to the traffic density and time than worry about other traffic conditions like light or road conditions. However, there is still space for further studies because it is possible to find more useful patterns from those vague variables which are classified as potentially critical variables in the report.   
+
+
+## **Question and Plan**
+
+The purpose of this report is to find any factors that could be related to the frequency and injury type of traffic collisions in Ottawa. The data set contains detailed information of collisions happened in Ottawa in 2016.All the data cleaning and transformation is recorded along with pre-analysis in the section of Data. Any non-related variables are excluded in the first part of Analysis. Then, more detailed plots are given to illustrate the significant variables. Variable selections are based on how the plots of the data reflects some common knowledge of traffic collisions. For example, in common sense, low visibility is a negative driving condition. Hence, to determine weather Light is a significant variable for the traffic in Ottawa, the plots should show most collisions happened under the light condition that causes low visibility. Otherwise, Light is not a significant variable. Finally, the conclusion  briefly describes the significant findings based on the previous analysis.
+
+
+## **Data**
+
+### Transformation and NA's
+```{r echo=FALSE}
+data <- read.csv('coll.csv')
+head(data)
+```
+
+By inspection, Record is deleted because it is just the index of the cases. Location shows the roads on which the collisions happened.However X and Y, which are geographical coordinates projected in MTM zone9, NAD83 format, provide more quantitative geographical information which is easier to visualize without loss of information. Hence, the report uses X and Y as geographical representatives instead of Location. Date gives the year, month and day on which the case happened. All the years can be ignored since all collisions happened in the same year.Meanwhile, including the days make the plots too noisy.The days may be useful for further analysis but they are not necessary for the purpose of visualization. Therefore, only the months are used in this report. Time is also simplified to hours to make the effect of each factors of the variable more representative and easier to visualize. During the data cleaning, a outlier in X is detected in 13481st row, so the row of the data is deleted. As stated before, X and Y are projected in the format of MTM zone9, NAD83, the outlier in X is greater than 5000000 which looks more like a value of Y coordinate. There are some missing values are found in Light, Collision_Location and Traffic_Control. Since they are not much, the corresponding rows are deleted. 
+
+### Summary
+```{r echo=FALSE}
+data<-data[-13481,]
+data<-data[!(data$Collision_Location=="" | data$Traffic_Control==""|data$Light==""),]
+data[] <- lapply( data, factor)
+data$Record<-NULL
+
+x<- as.character(data$X)
+for (i in 1:length(x)){
+  if (grepl(",", x[i], fixed = TRUE)){x[i]<-str_remove(x[i], ',')}
+}
+
+
+
+
+x<-as.numeric(x)
+
+y<- as.character(data$Y)
+
+for (i in 1:length(y)){
+  if (grepl(",", y[i], fixed = TRUE)){y[i]<-str_remove_all(y[i], ',')}
+}
+
+
+y<-as.numeric(y)
+
+
+
+
+
+options(digits=9)
+new1 <- data
+
+
+D<-NULL
+for (i in 1:length(new1$Date)){
+  if (substr(new1$Date[i],2,2)=='/'){
+    D[i]<-substr(new1$Date[i],1,1)
+  }
+  else{
+    D[i]<-substr(new1$Date[i],1,2)}
+}
+
+D<- as.integer(D)
+
+
+new1$Date<-D
+new1<-new1[order(new1$Date),]
+
+
+new1$X<- x
+new1$Y<- y
+
+
+t <- new1$Time
+b<-NULL
+for (i in 1:length(t)){
+  if (substr(t[i],2,2)==":" && substr(t[i],3,4) != "00"){b[i] = (1+as.integer(substr(t[i],1,1)))}
+  else if (substr(t[i],3,3)==":" && substr(t[i],3,4) != "00"){b[i] = (1+as.integer(substr(t[i],1,2)))}
+  else if (substr(t[i],2,2)==":"){b[i] = (as.integer(substr(t[i],1,1)))}
+  else{b[i] = (as.integer(substr(t[i],1,2)))}
+  if (t[i]=="0:00"){b[i]=(24)}
+}
+
+new1$Time<-b
+
+cl<-as.character(new1$Collision_Location)
+
+for (i in 1:length(cl)){
+  cl[i]<-substring(cl[i],6)
+
+}
+cl<-as.factor(cl)
+
+new1$Collision_Location<-cl
+
+summary(new1,maxsum = 12)
+```
+
+The summary gives a general view of the cleaned data. A rough domain of the study can be figured out from the summary of X and Y. The summary of Date and Time are not valuable because we intentionally defined them. The rest variables are all categorical with their counts of occurrence. We can see that many of them are not evenly distributed over categories, which could be clue of important effects. More detailed analysis is given below.
+
+
+## **Analysis**
+
+### Non-informative Variables
+
+![](Env.jpg){width=450px, height=450px}![](RS.jpg){width=450px, height=450px}
+
+The two plots show the collisions frequency under different environment, road surface condition respectively in order. The two plots are put together because they are non-informative in a similar way. From the first plot, most cases happened in a clear environment which is a positive driving condition compare to other kinds. In common sense, under negative driving conditions, collisions are more possible to happen. Hence, a reasonable explanation is that environment conditions are not critical for driving safety in Ottawa. Similarly, most collisions happened when the road is dry, which is a better road condition compare to others. Hence, road condition is neither a critical variable.
+
+### Potentially Critical Variables
+
+The following variables are potentially critical because the negative factors do have some effects but more detailed information are required to quantify their effects.
+
+![](TC.jpg){width=450px, height=450px}![](Light.jpg){width=450px, height=450px}
+
+According to the first plots above, many collisions happened when there are no traffic controls, but there are also significantly many cases happened with signal controls.It is hard to say that collision occurrence is related to traffic signals although, in common sense, traffic signals should reduce the number of traffic accidents. Similarly, from the second plot, although the number of cases happened in daylight is dominant, considering more people driving at the daytime, the number of cases happened in dark environment can be considered as significant. At least, these two variables are worthy of study if more information is available. 
+
+
+![](LvsC.jpg){width=450px, height=450px}![](imptype.jpg){width=450px, height=450px}
+
+These two plots above are more worthy of study because there are no dominant categories. However, in the first plot, many cases are classified as non-intersection which is too vague to interpret. For the second plot, we are more interested in how the impact types are related to the collision classification, but no obvious changes of the proportion of injury types appear when the impact type changes. 
+
+
+
+### Geographical Position vs Occurence
+
+
+#### Geographical Density
+
+![](GD.jpg)
+
+According to the density plot, the area where collisions happened most frequently in 2016, Ottawa are the main traffics located between Central Town and Lower Town including the 417 and 174 highways. There is also the handover between Ontario and Quebec, which is also the most trafficked area of Ottawa. 
+
+
+#### Date vs Collision_Classification Boxplot
+
+![](DateBox.jpg)
+
+The boxplot shows that collisions that caused injuries are more likely to happen at the second half of the year. The mean of fatal injury cases is greater than 7.5, which means most fatal injury cases happened after July. Similarly, More non fatal injury cases happened after June of 2016. Compare to the two types, P.D only is rather evenly distributed over the year.
+
+
+
+
+#### Definitive plot
+
+![](aim.gif)
+
+Here is definitive gif plot for geographical positions vs monthly occurrences. The corresponding months are displayed at left-up corner. The types of injury are also shown in the map. The big red circles are fatal injuries. The Blue dots are non fatal injuries. The small black dots are P.D only. One may notice that most red circles appear after July, which is consistent with the boxplot. Meanwhile, the circles are dots are very concentrated in the area we mentioned below the geographical density plot. It is also note worthy that most fatal injury and non fatal injury cases also very concentrated at the area. Hence, according to all the analysis above, the frequency of the occurrences is be related to the traffic density, and the injury type seems to be related to the Month.
+
+
+### Time vs Occurence
+
+#### Time vs Occurences per Month
+
+![](daytime_monthly.gif)
+
+As shown above, most collisions happened in the period from 7am to 10pm, and there are two peaks at 8am-10am and 4pm to 6pm. This is roughly true for every month through the year. Therefore, we first conclude that the time effect and Month effect are independent of each other. The two peaks are probably  the daily morning and evening rushes. One may also notice that, in January and December, the frequency of collisions at 12am are higher than other months.One reason for this cold be that more people went party and came home at midnight during the Christmas season. 
+
+#### Time Density
+
+Here is the density plot for the whole year as a comprehensive support for the description above. Again, we see two peaks at the morning and evening rush hours.
+
+![](DensityTime.jpg)
+
+
+
+#### Time vs Collision_Classification Boxplot
+
+![](TimeBox.jpg)
+
+The boxplot shows distribution of occurrences for each injury type throughout a day. Surprisingly, there are no significant differences among the three collision classifications. The average times for all three types of collisions are all 3pm. More than half of the cases happened within 10am to 7pm. This is true for all three classifications. Therefore, if someone wants to drive more safely during the daytime of Ottawa, he/she would better avoid this period. For example, one could arrive his/her office before 10am and go home after 7pm. 
+
+#### Definitive Plot
+
+![](daytime_total.jpg)
+
+Here is the comprehensive plot of Time vs Occurrences, and each bar is filled with colors which represent the collision classifications. As we mentioned above, the proportion of Non-fatal injuries and P.D only do not vary a lot from time to time. The fatal injury cases are also rather evenly distributed throughout the Time, although the number of fatal injuries may be too few to be representative. If we just look at the numbers, Non-fatal injury collisions happened the most at the two peaks which are 8am to 10am and 4pm to 6pm. Hence, we conclude that the number of collisions for each type is related to the morning and evening rushes.
+
+
+## **Conclusion**
+
+In conclusion, according to the data, Time, Date, X, Y, collision classifications and counts of the observations are the critical variables to understanding the traffic collisions in Ottawa. Not surprisingly, the occurrences are highly related to the traffic density. Based on the geographical analysis, most collisions happened on the main roads near the handover between Ontario and Quebec, where is also most trafficked area of Ottawa. For the similar reason, collisions happened most frequently during the morning and evening rushes. We also analyzed other minor factors that could affect the traffic conditions, but it turns out that they are not significant effects for the traffic in Ottawa. Hence, to drive safer in Ottawa, the best way is to avoid the two rushes during the day and pay more attention when you are driving in the places like Central Town, Sandy Hill, etc. 
+
+
+
+
+
+
+
+
+
+
+

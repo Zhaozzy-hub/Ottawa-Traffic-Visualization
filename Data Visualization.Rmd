@@ -1,0 +1,279 @@
+---
+title: "Data Visulization"
+author: "ziyi zhao"
+date: "2020/9/27"
+output: pdf_document
+---
+
+
+```{r include=FALSE}
+setwd("B:/R/531400E")
+options(max.print=1000000)
+data <- read.csv('coll.csv')
+data<-data[-13481,]
+
+
+# library
+library(ggplot2)
+library(gganimate)
+library(magrittr)
+library(magick)
+library(stringr)
+library(png)
+library(ggpubr)
+library(grid)
+
+```
+
+## Preprocessing 
+
+```{r}
+img<-png::readPNG('Ottawa.png')
+data[] <- lapply( data, factor)
+data$Record<-NULL
+data<-data[!(data$Collision_Location=="" | data$Traffic_Control==""|data$Light==""),]
+summary(data,maxsum = 12)
+```
+
+
+
+```{r}
+
+x<- as.character(data$X)
+for (i in 1:length(x)){
+  if (grepl(",", x[i], fixed = TRUE)){x[i]<-str_remove(x[i], ',')}
+}
+
+
+
+
+x<-as.numeric(x)
+
+y<- as.character(data$Y)
+
+for (i in 1:length(y)){
+  if (grepl(",", y[i], fixed = TRUE)){y[i]<-str_remove_all(y[i], ',')}
+}
+
+
+y<-as.numeric(y)
+
+
+
+
+
+options(digits=9)
+new1 <- data
+
+
+D<-NULL
+for (i in 1:length(new1$Date)){
+  if (substr(new1$Date[i],2,2)=='/'){
+    D[i]<-substr(new1$Date[i],1,1)
+  }
+  else{
+    D[i]<-substr(new1$Date[i],1,2)}
+}
+
+D<- as.integer(D)
+summary(D)
+
+new1$Date<-D
+new1<-new1[order(new1$Date),]
+
+
+new1$X<- x
+new1$Y<- y
+
+
+t <- new1$Time
+b<-NULL
+for (i in 1:length(t)){
+  if (substr(t[i],2,2)==":" && substr(t[i],3,4) != "00"){b[i] = (1+as.integer(substr(t[i],1,1)))}
+  else if (substr(t[i],3,3)==":" && substr(t[i],3,4) != "00"){b[i] = (1+as.integer(substr(t[i],1,2)))}
+  else if (substr(t[i],2,2)==":"){b[i] = (as.integer(substr(t[i],1,1)))}
+  else{b[i] = (as.integer(substr(t[i],1,2)))}
+  if (t[i]=="0:00"){b[i]=(24)}
+}
+
+new1$Time<-b
+
+cl<-as.character(new1$Collision_Location)
+
+for (i in 1:length(cl)){
+  cl[i]<-substring(cl[i],6)
+
+}
+cl<-as.factor(cl)
+summary(cl)
+new1$Collision_Location<-cl
+
+summary(new1,maxsum = 11)
+```
+
+
+
+
+
+# geo vs occurence
+
+
+```{r}
+
+
+
+
+a <- ggplot(new1, aes(X, Y, 
+                            group = Date),height=600,width = 800) +
+  annotation_custom(rasterGrob(img, 
+                               width = unit(1,"npc"), 
+                               height = unit(1,"npc")), 
+                               -Inf, Inf, -Inf, Inf) + 
+  geom_point(aes(color = Collision_Classification, size = Collision_Classification),alpha = 0.5) + scale_color_manual(values = c("red","blue","black"))+scale_size_manual(values = c(6,2,1))+
+  transition_states(Date,state_length = 5,transition_length = 1) +
+  exit_fade() +
+  enter_fade() +
+  labs(title = "Occurcence per Month",subtitle = "Month:{closest_state}")
+
+
+animate(a, height = 800, width =800,nframes=400)
+anim_save("aim.gif")
+```
+
+
+```{r}
+
+
+g1<-ggplot(new1, aes(x=X, y=Y) ) + ggtitle("Geographical Density")+
+  background_image(img)+
+  geom_bin2d(bins = 70) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw()
+ggsave("GD.jpg",plot = g1, path = "B:/R/531400E")
+```
+
+
+
+# time vs occurence
+
+```{r}
+aim2<-ggplot(new1, aes(x=factor(Time)),group=Date)+
+  xlab("Time")+
+  transition_states(Date,state_length = 1,transition_length = 1)+
+  geom_bar(stat="count", width=0.7,fill='steelblue')+
+  labs(title = "Month:{closest_state}")+
+  theme_minimal()
+
+animate(aim2,nframes=200)
+```
+
+```{r}
+
+g2 <- ggplot(new1, aes(x=factor(Time),fill=Collision_Classification))+
+  xlab("Time")+
+  geom_bar(stat = 'count')+
+  scale_fill_manual(values=c('black','red','blue'))+
+
+  theme_minimal()
+
+
+ggsave("daytime_total.jpg",plot = g2, path = "B:/R/531400E")
+```
+
+# collision_classification vs collision _location
+
+
+```{r}
+
+g3<-ggplot(data=new1, aes(x=Collision_Location, fill=Collision_Classification)) + 
+  geom_bar(stat="count")+
+  scale_fill_manual(values=c('black','red','blue'))+
+  theme(text = element_text(size=15),
+        axis.text.x = element_text(angle=45,hjust = 1)) 
+
+
+ggsave("LvsC.jpg",plot=g3,path="B:/R/531400E")
+```
+# collision_classification vs impact_type
+
+```{r}
+
+
+g4<-ggplot(data=new1, aes(x=Impact_type, fill=Collision_Classification)) + 
+  geom_bar(stat="count")+
+  scale_fill_manual(values=c('black','red','blue'))+
+  theme(text = element_text(size=15),
+        axis.text.x = element_text(angle=45,hjust = 1)) 
+
+ggsave("imptype.jpg",plot=g4,path="B:/R/531400E")
+```
+# collision_classification vs light
+```{r}
+
+
+g5<-ggplot(data=new1, aes(x=Light, fill=Collision_Classification)) + 
+  geom_bar(stat="count")+
+  scale_fill_manual(values=c('black','red','blue'))+
+  theme(text = element_text(size=15),
+        axis.text.x = element_text(angle=45,hjust = 1)) 
+
+ggsave("light.jpg",plot=g5,path="B:/R/531400E")
+```
+# collision_classification vs Environment
+```{r}
+
+
+g6<-ggplot(data=new1, aes(x=Environment, fill=Collision_Classification)) + 
+  geom_bar(stat="count")+
+  scale_fill_manual(values=c('black','red','blue'))+
+  theme(text = element_text(size=15),
+        axis.text.x = element_text(angle=45,hjust = 1)) 
+
+ggsave("Env.jpg",plot=g6,path="B:/R/531400E")
+```
+# collision_classification vs Road_Surface
+
+
+```{r}
+g7<-ggplot(data=new1, aes(x=Road_Surface, fill=Collision_Classification)) + 
+  geom_bar(stat="count")+
+  scale_fill_manual(values=c('black','red','blue'))+
+  theme(text = element_text(size=15),
+        axis.text.x = element_text(angle=45,hjust = 1)) 
+
+ggsave("RS.jpg",plot=g7,path="B:/R/531400E")
+```
+# collision_classification vs Traffic_Control
+```{r}
+g8<-ggplot(data=new1, aes(x=Traffic_Control, fill=Collision_Classification)) + 
+  geom_bar(stat="count")+
+  scale_fill_manual(values=c('black','red','blue'))+
+  theme(text = element_text(size=15),
+        axis.text.x = element_text(angle=45,hjust = 1)) 
+
+
+ggsave("TC.jpg",plot=g8,path="B:/R/531400E")
+```
+
+
+
+```{r}
+ggplot(new1,aes(x=Time)) +        # plotting mnO2 from the algae_blooms dataset ...
+    geom_histogram(aes(y=..density..),binwidth = 1) +  
+  geom_density(color="blue") 
+
+ggplot(new1,aes(x=Collision_Classification,y=Date)) +   
+    geom_boxplot()
+
+
+ggplot(new1,aes(x=Collision_Classification,y=Time)) +   
+    geom_boxplot()
+
+```
+
+
+
+
+
+
+
